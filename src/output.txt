@@ -1,0 +1,298 @@
+1c1
+< #include "main.h"
+---
+> #include "launcher.h"
+3,4c3,44
+< void SIGINT_handler(int sig); // Catching Ctrl+C
+< void SIGST_handler(int sig); // Catching Ctrl+C
+---
+> char **bonny = NULL;
+> int flag_bonus = 0;
+> int bonus_pid = -917;
+> int check_bg = 0;
+> int vm_flag = 0;
+> //char bonus_message[1000];
+> 
+> //char []
+> 
+> void SIGCHILD_handler(int sig) {
+> 
+>     int proc_no = 0;
+>     int status, wpid;
+>     wpid = waitpid(-1, &status, WNOHANG); // Returns >0 only on death of a child process.
+>     
+>     while (num_bg_process - proc_no > 0) {
+> 
+>         if ((bg_proc[proc_no] == NULL) || ((bg_proc[proc_no]->pid) - wpid != 0))
+>             proc_no++;
+>         else 
+>             break;
+>     }
+> 
+>     if (wpid > 0) {
+> 
+>         //printf("%s, %s, %s",bonny[0],bonny[1], bonny[2]);
+>         if (flag_bonus && bonus_pid == bg_proc[proc_no]->pid && !strcmp(bg_proc[proc_no]->cmd, "sleep")) {
+>             //cmd[2] = malloc(1000 * sizeof(char *));(
+>             (*builtin_functions[15])(bonny);
+>             flag_bonus = 0;
+>             bonus_pid = -917;
+>             bg_proc[proc_no] = NULL;
+>             bonny = NULL;
+>             free(bonny);
+>             return;
+>         }
+>         else {
+>             fprintf(stderr, "\n[%d] %s\tExit-flag:[%d]\n", wpid, bg_proc[proc_no]->cmd, status);
+>         }
+>         bg_proc[proc_no] = NULL;
+>     }
+> }
+6c46
+< int main(int argc, char **argv) {
+---
+> void SIGTSTP_handler(int sig) {
+8,37c48,55
+< 	signal(SIGINT, SIGINT_handler);
+< 	if (current_running_child_pid + 1 == 0)
+< 		signal(SIGTSTP, SIGST_handler);
+< 	
+< 	int status = 1;
+< 	int res = 1;
+< 	int len1 = 0;
+< 
+< 	char *cmd_line;
+< 	char **cmd_sequence, **cmd;
+< 	char result[sz];
+< 
+< 	//Initialize the shell
+< 	/*Collect information for the Shell Display Prompt*/
+< 	pws = getpwuid(geteuid()); 
+<     char hostname[sz];
+<     res = gethostname(hostname,sz);
+< 	if (res < 0) {
+< 		strcpy(hostname, "Shell");
+< 	}
+<     //char * line = NULL;
+<     //ssize_t buffsize = 0; 
+<     //getcwd(home,sz);
+< 	
+<     /* Getting current working directory and setting it up as Home*/
+< 	int len_home = 0;
+< 	char curr_dir[sz];
+<     getcwd(curr_dir,sz);
+<     strcpy(home,curr_dir);
+<     len_home =strlen(home);
+---
+>     int cmd_pid = 0;
+>     char spid[10];
+>     int itr = 0;
+> 
+>     if (kill(current_running_child_pid, 19) != 0) {
+>         //perror("Shell: ");
+>         return;
+>     }
+39,51c57,60
+< 	int i=0,j=0;
+< 	//Run command execution loop
+< 	while(status)
+< 	{
+< 		/*Display Prompt*/    
+<         fflush(stdin);
+<         getcwd(curr_dir,sz);
+< 		len1 = strlen(curr_dir);
+< 		i = j = 0;
+<         
+<         if(len_home - len1 > 0) {
+<         	printf(ANSI_ORANGE	"<%s@%s>" ANSI_BLUE ":" ANSI_RED	"%s" ANSI_RESET "$ ",pws->pw_name, hostname, curr_dir);
+<         	
+---
+>     while (itr < num_bg_process) {
+>         if (bg_proc[itr++] != NULL) {
+>             if (bg_proc[itr - 1]->pid == current_running_child_pid)
+>                 return;
+53,106c62
+<         else {
+<         	/*Check if the directory structure is continued or a parallel on is used*/
+< 			for(i = 0; i < len_home; i++, j++) {
+<         		if (home[j] - curr_dir[i] != 0) {
+<         			break;
+<         		}
+<         	}
+< 
+< 
+< 			if(len_home - j != 0) {
+<         		printf(ANSI_ORANGE	"<%s@%s>" ANSI_BLUE ":" ANSI_RED	"%s" ANSI_RESET "$ ",pws->pw_name,hostname, curr_dir);
+< 			}
+< 			else {
+< 
+< 				strcpy(result,"~");
+< 				strcat(result,curr_dir+j);
+<         		printf(ANSI_ORANGE	"<%s@%s>" ANSI_BLUE ":" ANSI_RED	"%s" ANSI_RESET "$ ",pws->pw_name,hostname, result);
+< 			}
+< 
+< 			i = 0;
+< 		}
+< 
+<         /*Read the command(s) from stdin*/
+< 		/*Parse the command(s) to get command(s) name and argument(s) required by that command*/
+<         cmd_line = read_cmd();
+<         cmd_sequence = parse_cmd(cmd_line, CMD_DELIMITER);
+<         
+<     	/*Execute the command(s)*/
+<         if (cmd_sequence != NULL)
+< 		{
+< 			i = 0;
+< 			while (cmd_sequence[i] != NULL && status) {
+< 				cmd = parse_cmd(cmd_sequence[i], TOKEN_DELIMITER);
+< 				int bg = is_background_process(cmd);
+< 				status = exec_cmd(cmd, bg);
+< 				free(cmd);
+< 				i++;			
+< 			}
+< 
+< 			//for (i=0; ((cmd_sequence[i] != NULL) && status); i++)
+< 			//{
+<             //    cmd = parse_cmd(cmd_sequence[i], TOKEN_DELIMITER);
+< 			//	int bg = is_background_process(cmd);
+< 			//	//for (j=0; cmd[j] != NULL; j++)
+< 			//	//	fprintf(stdout, "%s ", cmd[j]);
+< 			//	//printf(": %d\n", bg);
+< 			//	status = exec_cmd(cmd, bg);
+< 			//	free(cmd);
+< 			//}
+< 		}
+< 		free(cmd_sequence);
+< 		free(cmd_line);
+< 	}
+< 	//Terminate the shell
+---
+>     }
+108c64,79
+< 	return 0;
+---
+>     char proc_addr[100] = "/proc/";
+>     bg_proc[num_bg_process] = (background_process *)malloc(sizeof(background_process));
+>     bg_proc[num_bg_process] -> pid = current_running_child_pid;
+>     sprintf(spid, "%d", current_running_child_pid);
+>     strcat(proc_addr, spid);
+>     cmd_pid = current_running_child_pid;
+>     strcat(proc_addr, "/cmdline");
+>     int read_fd = open(proc_addr, O_RDONLY); 
+>     char cmd_name[1000];
+>     cmd_pid += cmd_pid;
+>     read(read_fd, cmd_name, 1000);
+>     strcpy(bg_proc[num_bg_process]->cmd, cmd_name);
+>     cmd_pid = 0;
+>     num_bg_process++;
+>     printf("\n[%d]+ Stopped \t%s\n", num_bg_process, cmd_name);
+>     //current_running_child_pid = 0;
+111,114c82,107
+< void SIGINT_handler(int sig) {
+< 	//printf("\n");
+< 	fflush(stdout);
+< }
+---
+> int launch_cmd(char **cmd, int bg)
+> {
+>     int pid, status;
+>     vm_flag = 0;
+> 
+>     if ((!strcmp(cmd[0], "vim") || !strcmp(cmd[0], "vi")) && bg) {
+>         vm_flag = 1;
+>     }
+> 
+>     if (!strcmp(cmd[0], "reminder"))
+>     {
+>         if (cmd[1] == NULL || cmd[2] == NULL) {
+>             fprintf(stderr, "Usage [ reminder {interval} {message} ]\n");
+>             return 1;
+>         }
+>         bonny = (char **)malloc(1000 * sizeof(char *));
+>         bonny[0] = (char *)malloc(100 * sizeof(char));
+>         bonny[1] = (char *)malloc(100 * sizeof(char));
+>         strcpy(bonny[0], cmd[0]);
+>         strcpy(bonny[1], cmd[1]);
+>         int j = 2; 
+>         while (cmd[j] != NULL) {
+>             bonny[j] = (char *)malloc(2000 * sizeof(char));
+>             strcpy(bonny[j], cmd[j]);
+>             j++;
+>         }
+116,119c109,178
+< void SIGST_handler(int sig) {
+< 	//printf("\n");
+< 	fflush(stdout);
+< }
+---
+>         //strcpy(bonus_message,cmd[2]);
+>         strcpy(cmd[0],"sleep");
+>         cmd[2] = NULL;
+>         flag_bonus = 1;
+>         //strcpy(bonus, cmd[2]);
+>         ////time_sleep = atoi(cmd[1]);
+>         ////size_t zise = strlen(cmd[0]) + strlen(cmd[1]) + strlen(cmd[2]);
+>         ////memcpy(bonny, cmd, zise);
+>         //strcpy(cmd[0], "sleep");
+>         //cmd[2] = NULL;
+>         //launch_cmd(cmd,1);
+>         //strcpy(cmd[0], "reminder");
+>         //strcpy(cmd[2],bonus);
+>         //return (*builtin_functions[i])remr(cmd);
+>     }
+>     
+>     signal(SIGCHLD, SIGCHILD_handler);
+>     pid = fork();
+> 
+> 
+>     if (pid < 0 ) {
+>         perror("Shell: ");
+>     }
+>     else if (!pid) {
+> 
+>         cmd=redirect(cmd);
+>         //printf("1. %s",cmd[0]);
+>         //sleep(3);
+>         if (execvp(cmd[0], cmd) + 1 == 0)
+>             perror("Shell: ");
+>         
+>         exit(EXIT_FAILURE);
+>     }
+>     else {
+> 
+>         if (bg - check_bg == 0) {
+>             current_running_child_pid = pid;
+>             //printf("2. %d\n",pid);
+>             //sleep(3);
+>             signal(SIGTSTP, SIGTSTP_handler);
+>             waitpid(pid, &status, WUNTRACED);
+>         }
+>         else
+>         {   
+>             check_bg = 0;
+>             bg_proc[num_bg_process] = (background_process *)malloc(sizeof(background_process));
+>             bg_proc[num_bg_process] -> pid = pid;
+>             if (flag_bonus && !strcmp(cmd[0],"sleep")) {
+>                 bonus_pid = pid;
+>             }
+>             else {
+>                 printf("[%d] %s\n", pid, cmd[0]);
+>             }
+>             check_bg += check_bg;
+>             strcpy(bg_proc[num_bg_process] -> cmd, cmd[0]);
+>             if (vm_flag) {
+>                 //sleep(1);
+>                 //printf("3. %d\n", pid);
+>                 //printf("4. %d\n",bg_proc[num_bg_process]->pid);
+>                 //sleep(3);
+>                 kill(bg_proc[num_bg_process]->pid, 19);
+>                 //kill(bg_proc[num_bg_process]->pid, 21);
+>                 vm_flag = 0;
+>             }
+>             num_bg_process++;
+>         }
+>     }
+>     //vm_flag = 0;
+>     return 1;
+> }
+\ No newline at end of file
